@@ -114,6 +114,7 @@ def generate_code():
     file_path = os.path.join(file_dir, 'mag_tables.h')
 
     with open(file_path, 'w') as file:
+        file.write(f"#ifndef _MAG_TABLES_H\n#define _MAG_TABLES_H\n\n")
         file.write(f"#define SAMPLING_RES {SAMPLING_RES}\n")
         file.write(f"#define SAMPLING_MIN_LAT {SAMPLING_MIN_LAT}\n")
         file.write(f"#define SAMPLING_MAX_LAT {SAMPLING_MAX_LAT}\n")
@@ -125,6 +126,7 @@ def generate_code():
         file.write(f"{__generate_table_code(__get_declination(), 'declination', 'degrees')}\n")
         file.write(f"{__generate_table_code(__get_inclination(), 'inclination', 'degrees')}\n")
         file.write(f"{__generate_table_code(__get_strength(), 'strength', 'nT')}\n")
+        file.write(f"#endif")
 
 
 if __name__ == "__main__":
