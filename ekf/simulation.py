@@ -9,7 +9,9 @@ Resources:
 import numpy as np
 from . import ekf, analysis, derivation, data_provider, scenarios
 
-config = {"dt": 0.01, "g": -9.81}
+DT = 0.01
+G = -9.81
+N = 1000
 
 control_variances = {
     "a_x": 0.1,
@@ -21,7 +23,7 @@ control_variances = {
 }
 
 meas_variances = {
-    "gps": 1,
+    "gps": 0.5,
     "baro": 0.5,
     "mag": 0.3,
 }
@@ -30,13 +32,13 @@ init_params = {
     "x0": np.array(
         [[1, 0, 0, 0, 0, 0, 0, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
     ).T,
-    "P0": np.eye(22) * 1000,
+    "P0": np.eye(22) * N,
 }
 
 handles = derivation.run_derivation(False)
 
 measurements, flags, controls = scenarios.generate_scenario_free_fall_parachute(
-    1000, config["dt"], config["g"], 1000, control_variances | meas_variances
+    N, DT, G, init_params["x0"][9][0], control_variances | meas_variances
 )
 
 n_m = measurements.shape[1]
@@ -44,8 +46,8 @@ filt = ekf.ExtendedKalmanFilter(
     init_params["x0"],
     init_params["P0"],
     n_m,
-    config["g"],
-    config["dt"],
+    G,
+    DT,
     list(control_variances.values()),
 )
 
@@ -83,4 +85,4 @@ for i in range(n_m):
 
 filt.predict(controls[:, i], handles["f"], handles["F"], handles["Q"])
 
-analysis.draw_plots(filt.X_est, config["dt"])
+analysis.draw_plots(filt.X_est, DT)
