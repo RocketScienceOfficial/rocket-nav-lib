@@ -180,6 +180,7 @@ def geo_bearing(lat0, lon0, lat1, lon1):
 
 
 # ================== TEST CASES ==================
+# REF: Matlab (Mathworks)
 
 
 if __name__ == "__main__":
