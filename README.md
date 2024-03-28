@@ -1,7 +1,7 @@
 # Rocket Estimation and Control Library
 
 ## Overview
-This repository contains all scripts needed to derive Extended Kalman Filter equations, simulate on either fake and real data and analize it
+This repository contains all scripts needed to derive Extended Kalman Filter equations, simulate either fake or real data and analize it
 
 There are also files used to download current magnetic tables (NOAA) and containing equations for transforming geographic coordinates
 

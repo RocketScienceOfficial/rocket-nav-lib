@@ -57,31 +57,31 @@ for i in range(n_m):
     current_flags = flags[:, i]
     current_meas = measurements[:, i]
 
-    # filt.correct(current_meas, handles['h'], handles['H'], handles['R'](meas_variances['gps'], meas_variances['baro'], meas_variances['mag']))
+    filt.correct(current_meas, handles['h'], handles['H'], handles['R'](meas_variances['gps'], meas_variances['baro'], meas_variances['mag']))
 
-    if current_flags[0] == True:
-        filt.correct(
-            current_meas[0:3],
-            handles["h_gps"],
-            handles["H_gps"],
-            handles["R_gps"](meas_variances["gps"]),
-        )
+    # if current_flags[0] == True:
+    #     filt.correct(
+    #         current_meas[0:3],
+    #         handles["h_gps"],
+    #         handles["H_gps"],
+    #         handles["R_gps"](meas_variances["gps"]),
+    #     )
 
-    if current_flags[3] == True:
-        filt.correct(
-            current_meas[3],
-            handles["h_baro"],
-            handles["H_baro"],
-            handles["R_baro"](meas_variances["baro"]),
-        )
+    # if current_flags[3] == True:
+    #     filt.correct(
+    #         current_meas[3],
+    #         handles["h_baro"],
+    #         handles["H_baro"],
+    #         handles["R_baro"](meas_variances["baro"]),
+    #     )
 
-    if current_flags[4] == True:
-        filt.correct(
-            current_meas[4:7],
-            handles["h_mag"],
-            handles["H_mag"],
-            handles["R_mag"](meas_variances["mag"]),
-        )
+    # if current_flags[4] == True:
+    #     filt.correct(
+    #         current_meas[4:7],
+    #         handles["h_mag"],
+    #         handles["H_mag"],
+    #         handles["R_mag"](meas_variances["mag"]),
+    #     )
 
 filt.predict(controls[:, i], handles["f"], handles["F"], handles["Q"])
 

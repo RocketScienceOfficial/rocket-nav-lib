@@ -1,7 +1,7 @@
-'''
+"""
 Resources:
-    - https://github.com/PX4/ecl/commit/264c8c4e8681704e4719d0a03b848df8617c0863
-'''
+    - https://github.com/PX4/PX4-ECL/blob/master/EKF/python/ekf_derivation/code_gen.py
+"""
 
 from sympy import ccode, cse, symbols, Matrix
 from sympy.codegen.ast import float32, real
