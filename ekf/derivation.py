@@ -81,6 +81,26 @@ def generate_cov_prediction(P, F, Q):
     return P_new
 
 
+def generate_obs(state, pos, pos_d, rot_to_body, mag, mag_bias):
+    obs_gps_var = symbols("R_GPS")
+    obs_baro_var = symbols("R_BARO")
+    obs_mag_var = symbols("R_MAG")
+
+    h = Matrix([pos, pos_d, rot_to_body * mag + mag_bias])
+    H = h.jacobian(state)
+    R = diag(
+        obs_gps_var,
+        obs_gps_var,
+        obs_gps_var,
+        obs_baro_var,
+        obs_mag_var,
+        obs_mag_var,
+        obs_mag_var,
+    )
+
+    return h, H, R
+
+
 def generate_gps_observation(state, pos):
     obs_var = symbols("R_GPS")
 
@@ -239,13 +259,17 @@ def run_derivation(generate_eqs):
         ]
     )
 
-    _print_matrix(f)
-
     print("Computing Jacobians...")
 
     F = f.jacobian(state_vector)
     G = f.jacobian(control_vector)
     Q = G * Matrix.diag(*sigma_vector) * G.T
+
+    h, H, R = generate_obs(state_vector, pos, pos_d, rot_to_body, mag, mag_bias)
+
+    _print_matrix(h)
+
+    return
 
     h_gps, H_gps, R_gps, R_gps_var = generate_gps_observation(state_vector, pos)
     h_baro, H_baro, R_baro, R_baro_var = generate_baro_observation(state_vector, pos_d)
@@ -263,6 +287,10 @@ def run_derivation(generate_eqs):
         )
 
         print("Generating Observation Equations...")
+
+        code_gen.write_obs_eqs(
+            "fusion", _generate_observation_equations(P, state_vector, H, R)
+        )
 
         code_gen.write_obs_eqs(
             "gps_fusion", _generate_observation_equations(P, state_vector, H_gps, R_gps)

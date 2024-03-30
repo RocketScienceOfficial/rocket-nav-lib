@@ -32,7 +32,7 @@ init_params = {
     "x0": np.array(
         [[1, 0, 0, 0, 0, 0, 0, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
     ).T,
-    "P0": np.eye(22) * N,
+    "P0": np.eye(22) * 1000,
 }
 
 handles = derivation.run_derivation(False)
@@ -57,7 +57,14 @@ for i in range(n_m):
     current_flags = flags[:, i]
     current_meas = measurements[:, i]
 
-    filt.correct(current_meas, handles['h'], handles['H'], handles['R'](meas_variances['gps'], meas_variances['baro'], meas_variances['mag']))
+    filt.correct(
+        current_meas,
+        handles["h"],
+        handles["H"],
+        handles["R"](
+            meas_variances["gps"], meas_variances["baro"], meas_variances["mag"]
+        ),
+    )
 
     # if current_flags[0] == True:
     #     filt.correct(
