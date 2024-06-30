@@ -4,92 +4,64 @@ Resources:
         - PX4 Docs: https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html
         - PX4 Models PDF: https://github.com/PX4/PX4-ECL/blob/master/EKF/documentation/Process%20and%20Observation%20Models.pdf
         - AHRS: https://ahrs.readthedocs.io/en/latest/filters/ekf.html
+
+Register:
+    - Fusion of multiple irregular frames, with different sampling rates
+        - Velocity has large oscillations
+    - Observation: Kalman Gain & H Jacobian can be "stacked" with sub matrices for particular fusions
 """
 
 import numpy as np
-from . import ekf, analysis, derivation, data_provider, scenarios
+import csv
+import matplotlib.pyplot as plt
+from . import ekf, derivation
 
-DT = 0.01
-G = -9.81
-N = 1000
+# TODO: Move to numpy
 
-control_variances = {
-    "a_x": 0.1,
-    "a_y": 0.1,
-    "a_z": 0.1,
-    "w_x": 0.1,
-    "w_y": 0.1,
-    "w_z": 0.1,
-}
+DT = 0.0025
+meas = []
+ctrls = []
+n_m = 0
 
-meas_variances = {
-    "gps": 0.5,
-    "baro": 0.5,
-    "mag": 0.3,
-}
+with open("./ekf/data/flightlog.csv") as file:
+    reader = csv.reader(file, delimiter=",")
 
-init_params = {
-    "x0": np.array(
-        [[1, 0, 0, 0, 0, 0, 0, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
-    ).T,
-    "P0": np.eye(22) * 1000,
-}
+    base_baro_height = 0
+    base_gps_height = 0
+
+    for x in reader:
+        press = float(x[19])
+        baro_height = 44330.76923 * (1 - ((press / 101325) ** 0.1902632))
+        alt = float(x[23])
+
+        if base_baro_height == 0:
+            base_baro_height = baro_height
+        if base_gps_height == 0:
+            base_gps_height = alt
+
+        baro_height -= base_baro_height
+        alt -= base_gps_height
+
+        meas.append([baro_height, alt])
+        ctrls.append([])
+        n_m += 1
+
 
 handles = derivation.run_derivation(False)
-
-measurements, flags, controls = scenarios.generate_scenario_free_fall_parachute(
-    N, DT, G, init_params["x0"][9][0], control_variances | meas_variances
-)
-
-n_m = measurements.shape[1]
 filt = ekf.ExtendedKalmanFilter(
-    init_params["x0"],
-    init_params["P0"],
+    np.array([[0]]).T,
+    np.eye(1) * 1000,
     n_m,
-    G,
-    DT,
-    list(control_variances.values()),
+    np.array([0.5]),
 )
 
 for i in range(n_m):
-    filt.predict(controls[:, i], handles["f"], handles["F"], handles["Q"])
+    filt.predict(ctrls[i], handles["f"], handles["F"], handles["Q"])
+    filt.correct(meas[i], handles["h"], handles["H"], handles["R"](0.5, 5))
 
-    current_flags = flags[:, i]
-    current_meas = measurements[:, i]
+t = np.arange(0, n_m * DT, DT)
 
-    filt.correct(
-        current_meas,
-        handles["h"],
-        handles["H"],
-        handles["R"](
-            meas_variances["gps"], meas_variances["baro"], meas_variances["mag"]
-        ),
-    )
-
-    # if current_flags[0] == True:
-    #     filt.correct(
-    #         current_meas[0:3],
-    #         handles["h_gps"],
-    #         handles["H_gps"],
-    #         handles["R_gps"](meas_variances["gps"]),
-    #     )
-
-    # if current_flags[3] == True:
-    #     filt.correct(
-    #         current_meas[3],
-    #         handles["h_baro"],
-    #         handles["H_baro"],
-    #         handles["R_baro"](meas_variances["baro"]),
-    #     )
-
-    # if current_flags[4] == True:
-    #     filt.correct(
-    #         current_meas[4:7],
-    #         handles["h_mag"],
-    #         handles["H_mag"],
-    #         handles["R_mag"](meas_variances["mag"]),
-    #     )
-
-filt.predict(controls[:, i], handles["f"], handles["F"], handles["Q"])
-
-analysis.draw_plots(filt.X_est, DT)
+# plt.plot(t, filt.X_est[0])
+plt.plot(t, list(map(lambda x: x[1], meas)))
+plt.ylim(-5, 50)
+plt.show()

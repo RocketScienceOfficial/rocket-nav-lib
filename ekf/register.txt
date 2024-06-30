@@ -1,3 +1,0 @@
-- Fusion of multiple irregular frames, with different sampling rates
-    - Velocity has large oscillations
-- Observation: Kalman Gain & H Jacobian can be "stacked" with sub matrices for particular fusions

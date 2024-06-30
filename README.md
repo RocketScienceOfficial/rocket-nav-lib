@@ -1,9 +1,9 @@
-# Rocket Estimation and Control Library
+# Rocket Navigation Library
 
 ## Overview
 This repository contains all scripts needed to derive Extended Kalman Filter equations, simulate either fake or real data and analize it
 
-There are also files used to download current magnetic tables (NOAA) and containing equations for transforming geographic coordinates
+There are also scripts used to download current magnetic tables (NOAA) and containing equations for transforming geographic coordinates
 
 ## Features
 1. EKF
@@ -26,7 +26,7 @@ pip install -r requirements.txt
 ## Usage
 The project is written in Python and each folder is a [package](https://docs.python.org/3/tutorial/modules.html#packages)
 
-Some files only provide useful functions!
+Some scripts only provide useful functions!
 
 For example to generate EKF equations run (from project root directory):
 
