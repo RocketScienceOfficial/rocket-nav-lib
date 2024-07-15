@@ -75,11 +75,7 @@ def _generate_table_code(table, name, unit):
         code += "\t{"
 
         for j in range(len(table[i])):
-            v = (
-                int(round(math.radians(table[i][j]) * 10000))
-                if "radians" in unit
-                else int(round(table[i][j] / 10))
-            )
+            v = int(round(math.radians(table[i][j]) * 10000)) if "radians" in unit else int(round(table[i][j] / 10))
 
             code += str(v) + ", "
 
@@ -110,15 +106,9 @@ def generate_code():
         file.write(f"#define LAT_DIM {LAT_DIM}\n")
         file.write(f"#define LON_DIM {LON_DIM}\n")
         file.write("\n")
-        file.write(
-            f"{_generate_table_code(_get_declination(), 'declination', 'radians * 10^4')}\n"
-        )
-        file.write(
-            f"{_generate_table_code(_get_inclination(), 'inclination', 'radians * 10^4')}\n"
-        )
-        file.write(
-            f"{_generate_table_code(_get_strength(), 'strength', 'Gauss * 10^4')}\n"
-        )
+        file.write(f"{_generate_table_code(_get_declination(), 'declination', 'radians * 10^4')}\n")
+        file.write(f"{_generate_table_code(_get_inclination(), 'inclination', 'radians * 10^4')}\n")
+        file.write(f"{_generate_table_code(_get_strength(), 'strength', 'Gauss * 10^4')}\n")
         file.write(f"#endif")
 
 

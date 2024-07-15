@@ -1,49 +1,47 @@
 import numpy as np
+from . import quaternion
 
 
 class ExtendedKalmanFilter:
-    def __init__(self, x0, P0, n_m, ctrl_vars):
-        self.x = x0
-        self.P = P0
+    def __init__(self, x0, P0_value, dt, g):
+        self.x = np.array([x0], dtype=float).T
+        self.P = np.eye(len(x0), dtype=float) * P0_value
+        self.dt = dt
+        self.g = g
 
-        self.ctrl_vars = ctrl_vars
-
-        n_x = self.x.shape[0]
-
-        self.i = -1
-        self.X_est = np.zeros((n_x, n_m))
-        self.X_pred = np.zeros((n_x, n_m + 1))
-        self.P_est = np.zeros((n_x, n_x, n_m))
-        self.P_pred = np.zeros((n_x, n_x, n_m + 1))
-
-    def predict(self, z, f, F, Q):
-        calc_f = f(*self.x[:, 0], *z)
-        calc_F = F(*self.x[:, 0], *z)
-        calc_Q = Q(*self.x[:, 0], *self.ctrl_vars)
+    def predict(self, u, f, F, Q, ctrl_vars):
+        calc_f = f(*self.x[:, 0], *u, self.g, self.dt)
+        calc_F = F(*self.x[:, 0], *u, self.g, self.dt)
+        calc_Q = Q(*self.x[:, 0], *u, *ctrl_vars, self.g, self.dt)
 
         self.x = calc_f
         self.P = calc_F @ self.P @ calc_F.T + calc_Q
 
-        self.i += 1
+        self._normalize_quat()
+        self._force_cov_symmetry()
 
-        i = self.i
-
-        self.X_pred[:, i : i + 1] = self.x
-        self.P_pred[:, :, i : i + 1] = self.P[..., np.newaxis]
-
-    def correct(self, z, h, H, R):
+    def correct(self, z, h, H, R, meas_vars):
         z = np.array([z]).T
 
         calc_h = h(*self.x[:, 0])
         calc_H = H(*self.x[:, 0])
+        calc_R = R(*meas_vars)
 
         PH_ = self.P @ calc_H.T
-        K = PH_ @ np.linalg.inv(calc_H @ PH_ + R)
+        K = PH_ @ np.linalg.inv(calc_H @ PH_ + calc_R)
         self.x = self.x + K @ (z - calc_h)
         I_KH = np.eye(calc_H.shape[1]) - K @ calc_H
-        self.P = I_KH @ self.P @ I_KH.T + K @ R @ K.T
+        self.P = I_KH @ self.P @ I_KH.T + K @ calc_R @ K.T
 
-        i = self.i
+        self._normalize_quat()
+        self._force_cov_symmetry()
 
-        self.X_est[:, i : i + 1] = self.x
-        self.P_est[:, :, i : i + 1] = self.P[..., np.newaxis]
+    def _normalize_quat(self):
+        self.x[0:4, 0] = quaternion.quat_normalize(self.x[0:4, 0])
+
+    def _force_cov_symmetry(self):
+        for i in range(len(self.P)):
+            for j in range(i):
+                tmp = (self.P[i, j] + self.P[j, i]) / 2
+                self.P[i, j] = tmp
+                self.P[j, i] = tmp
