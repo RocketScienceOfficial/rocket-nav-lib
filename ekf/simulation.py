@@ -4,6 +4,12 @@ import matplotlib.pyplot as plt
 from geo import geo
 from . import ekf, derivation, voting, quaternion
 
+# ========== CONSTANTS ==========
+
+
+g = -9.80665
+dt = 0.0025
+
 
 # ========== DATA ==========
 
@@ -22,6 +28,9 @@ with open("./ekf/data/flightlog.csv") as file:
         acc2_x = float(x[5])
         acc2_y = -float(x[4])
         acc2_z = float(x[6])
+        acc3_x = -float(x[8])
+        acc3_y = float(x[7])
+        acc3_z = float(x[9]) - g
         gyro1_x = float(x[10])
         gyro1_y = float(x[11])
         gyro1_z = float(x[12])
@@ -43,16 +52,45 @@ with open("./ekf/data/flightlog.csv") as file:
         baro_height = geo.baro_formula(press) - base_params[0]
         pos = geo.geo_to_ned(lat, lon, alt, base_params[1], base_params[2], base_params[3])
 
-        data.append([pos[0], pos[1], pos[2], baro_height, mag_x, mag_y, mag_z, acc1_x, acc1_y, acc1_z, acc2_x, acc2_y, acc2_z, gyro1_x, gyro1_y, gyro1_z, gyro2_x, gyro2_y, gyro2_z, state])
+        data.append(
+            [
+                pos[0],
+                pos[1],
+                pos[2],
+                baro_height,
+                mag_x,
+                mag_y,
+                mag_z,
+                acc1_x,
+                acc1_y,
+                acc1_z,
+                acc2_x,
+                acc2_y,
+                acc2_z,
+                acc3_x,
+                acc3_y,
+                acc3_z,
+                gyro1_x,
+                gyro1_y,
+                gyro1_z,
+                gyro2_x,
+                gyro2_y,
+                gyro2_z,
+                state,
+            ]
+        )
 
 
 # ========== FILTER ==========
 
 
-dt = 0.0025
-g = -9.80665
 start_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 start_covariance_value = 1
+variance_acc_1 = 0.5
+variance_acc_2 = 0.5
+variance_acc_3 = 2
+variance_gyro_1 = 0.3
+variance_gyro_2 = 0.3
 variance_mag = 0.9
 variance_gps = 2.1
 variance_baro_height = 0.9
@@ -67,18 +105,21 @@ filt = ekf.ExtendedKalmanFilter(
     g,
 )
 
-acc_voter = voting.SensorVoting([6, 32], [0.5, 0.5])
-gyro_voter = voting.SensorVoting([500, 2000], [0.3, 0.3])
+acc_voter = voting.SensorVoting([6, 32, 100], [variance_acc_1, variance_acc_2, variance_acc_3])
+gyro_voter = voting.SensorVoting([500, 2000], [variance_gyro_1, variance_gyro_2])
 
 filter_data = []
+tst = []
 
 for i in range(len(data)):
-    [acc_x, acc_x_var] = acc_voter.vote([data[i][7], data[i][10]])
-    [acc_y, acc_y_var] = acc_voter.vote([data[i][8], data[i][11]])
-    [acc_z, acc_z_var] = acc_voter.vote([data[i][9], data[i][12]])
-    [gyro_x, gyro_x_var] = gyro_voter.vote([data[i][13], data[i][16]])
-    [gyro_y, gyro_y_var] = gyro_voter.vote([data[i][14], data[i][17]])
-    [gyro_z, gyro_z_var] = gyro_voter.vote([data[i][15], data[i][18]])
+    [acc_x, acc_x_var] = acc_voter.vote([data[i][7], data[i][10], data[i][13]])
+    [acc_y, acc_y_var] = acc_voter.vote([data[i][8], data[i][11], data[i][14]])
+    [acc_z, acc_z_var] = acc_voter.vote([data[i][9], data[i][12], data[i][15]])
+    [gyro_x, gyro_x_var] = gyro_voter.vote([data[i][16], data[i][19]])
+    [gyro_y, gyro_y_var] = gyro_voter.vote([data[i][17], data[i][20]])
+    [gyro_z, gyro_z_var] = gyro_voter.vote([data[i][18], data[i][21]])
+
+    tst.append([acc_x, acc_y, acc_z])
 
     filt.predict([acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z], handles["f"], handles["F"], handles["Q"], [(acc_x_var + acc_y_var + acc_z_var) / 3, (gyro_x_var + gyro_y_var + gyro_z_var) / 3])
     filt.correct(data[i][0:7], handles["h"], handles["H"], handles["R"], [variance_gps, variance_baro_height, variance_mag])
@@ -106,6 +147,7 @@ axis[1].axis("scaled")
 tmp = []
 for i in range(len(data)):
     tmp.append(quaternion.quat_rotate_vec(filter_data[i][0:4], [data[i][7], data[i][8], data[i][9]])[0])
+    # tmp.append([data[i][12]])
     # tmp.append(data[i][9])
 axis[2].plot(t, tmp)
 
