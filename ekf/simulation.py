@@ -16,7 +16,8 @@ dt = 0.0025
 
 data = []
 
-with open("./ekf/data/flightlog.csv") as file:
+#with open("./ekf/data/flightlog.csv") as file:
+with open("./ekf/data/test5.csv") as file:
     reader = csv.reader(file, delimiter=",")
 
     base_params = []
@@ -97,8 +98,8 @@ variance_acc_3 = 2
 variance_gyro_1 = 0.3
 variance_gyro_2 = 0.3
 variance_mag = 0.9
-variance_gps = 2.2
-variance_baro_height = 0.6
+variance_gps = 1.3
+variance_baro_height = 1.8
 
 handles = derivation.run_derivation(False)
 filt = ekf.ExtendedKalmanFilter(
@@ -118,7 +119,6 @@ for i in range(len(data)):
     filt.correct([data[i][2], data[i][3]], handles["h"], handles["H"], handles["R"], [variance_gps, variance_baro_height])
 
     filter_data.append(filt.x[:, 0])
-    # filter_data.append([data[i][3]])
 
 
 # ========== ANALYSIS ==========
@@ -133,10 +133,10 @@ t = np.arange(0, len(filter_data) * dt, dt)
 
 axis[0].plot(t, list(map(lambda x: x[0], filter_data)))
 START_ACC_THRESHOLD = 35
-START_ALT_THRESHOLD = 4
+START_ALT_THRESHOLD = 5
 START_ALT_VERIFICATION_COUNT = 300
-APOGEE_MAX_DELTA = 4
-LAND_MAX_DELTA = 3
+APOGEE_MAX_DELTA = 2
+LAND_MAX_DELTA = 2
 LAST_ALT_APOGEE_VERIFICATION_COUNT = 200
 LAST_ALT_LAND_VERIFICATION_COUNT = 400
 state = "standing"
