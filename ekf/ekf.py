@@ -17,7 +17,7 @@ class ExtendedKalmanFilter:
         self.x = calc_f
         self.P = calc_F @ self.P @ calc_F.T + calc_Q
 
-        self._normalize_quat()
+        #self._normalize_quat()
         self._force_cov_symmetry()
 
     def correct(self, z, h, H, R, meas_vars):
@@ -33,7 +33,7 @@ class ExtendedKalmanFilter:
         I_KH = np.eye(calc_H.shape[1]) - K @ calc_H
         self.P = I_KH @ self.P @ I_KH.T + K @ calc_R @ K.T
 
-        self._normalize_quat()
+        #self._normalize_quat()
         self._force_cov_symmetry()
 
     def _normalize_quat(self):

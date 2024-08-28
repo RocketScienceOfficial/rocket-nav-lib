@@ -1,4 +1,5 @@
 from sympy import *
+from . import code_gen
 
 
 def _quat_to_rot(q):
@@ -37,6 +38,26 @@ def _print_matrix(m: Matrix):
         print("")
 
 
+def _create_cov_matrix_entry(i, j):
+    return Symbol("P[" + str(i) + "][" + str(j) + "]", real=True)
+
+
+def _create_cov_matrix(n):
+    return Matrix(n, n, _create_cov_matrix_entry)
+
+
+def generate_observation_equations(P, H, R):
+    K = P * H.T * (H * P * H.T + R).inv()
+
+    return H, K
+
+
+def generate_cov_prediction(P, F, Q):
+    P_new = F * P * F.T + Q
+
+    return P_new
+
+
 def run_derivation(generate_eqs):
     print("Starting derivation...")
 
@@ -44,86 +65,29 @@ def run_derivation(generate_eqs):
 
     print("Setting State Vector...")
 
-    q_w, q_x, q_y, q_z = symbols("q_w, q_x, q_y, q_z")
-    q = Matrix([q_w, q_x, q_y, q_z])
-    rot_to_earth = _quat_to_rot(q)
-    rot_to_body = rot_to_earth.T
-
-    vel_n, vel_e, vel_d = symbols("vel_n, vel_e, vel_d")
-    vel = Matrix([vel_n, vel_e, vel_d])
-
-    pos_n, pos_e, pos_d = symbols("pos_n, pos_e, pos_d")
-    pos = Matrix([pos_n, pos_e, pos_d])
-
-    mag_n, mag_e, mag_d = symbols("mag_n, mag_e, mag_d")
-    mag = Matrix([mag_n, mag_e, mag_d])
+    z = symbols("z")
 
     state_vector = Matrix(
         [
-            q_w,
-            q_x,
-            q_y,
-            q_z,
-            vel_n,
-            vel_e,
-            vel_d,
-            pos_n,
-            pos_e,
-            pos_d,
-            mag_n,
-            mag_e,
-            mag_d,
-        ]
-    )
-
-    print("Setting Control Vector...")
-
-    gyro_x, gyro_y, gyro_z = symbols("gyro_x, gyro_y, gyro_z")
-    gyro = Matrix([gyro_x, gyro_y, gyro_z])
-
-    accel_x, accel_y, accel_z = symbols("accel_x, accel_y, accel_z")
-    accel = Matrix([accel_x, accel_y, accel_z])
-
-    control_vector = Matrix(
-        [
-            accel_x,
-            accel_y,
-            accel_z,
-            gyro_x,
-            gyro_y,
-            gyro_z,
-        ]
-    )
-
-    print("Setting Variance Vector...")
-
-    var_acc, var_gyr = symbols("sigma_acc, sigma_gyr")
-
-    process_variance_vector = Matrix(
-        [
-            var_acc,
-            var_acc,
-            var_acc,
-            var_gyr,
-            var_gyr,
-            var_gyr,
+            z,
         ]
     )
 
     print("Computing Transition Function...")
 
-    corrected_acc = rot_to_earth * accel + Matrix([0, 0, g])
-    q_new = _quat_mult(q, Matrix([1, gyro[0] * dt / 2, gyro[1] * dt / 2, gyro[2] * dt / 2]))
-    vel_new = vel + corrected_acc * dt
-    pos_new = pos + vel * dt
-    mag_new = mag
-
     f = Matrix(
         [
-            q_new,
-            vel_new,
-            pos_new,
-            mag_new,
+            z,
+        ]
+    )
+
+    print("Setting Variance Vector...")
+
+    var_h = symbols("sigma_h")
+
+    process_variance_vector = Matrix(
+        [
+            var_h,
         ]
     )
 
@@ -131,41 +95,48 @@ def run_derivation(generate_eqs):
 
     h = Matrix(
         [
-            pos,
-            pos_d,
-            # rot_to_body * mag,
-            mag,
+            z,
+            z,
         ]
     )
 
     print("Computing Jacobians...")
 
     F = f.jacobian(state_vector)
-    G = f.jacobian(control_vector)
-    Q = G * Matrix.diag(*process_variance_vector) * G.T
+    Q = F * Matrix.diag(*process_variance_vector) * F.T
     H = h.jacobian(state_vector)
 
     print("Computing Measurement Covariance...")
 
-    var_gps, var_baro, var_mag = symbols("R_GPS, R_BARO, R_MAG")
+    var_gps, var_baro = symbols("R_GPS, R_BARO")
 
-    meas_variance_vector = Matrix([var_gps, var_gps, var_gps, var_baro, var_mag, var_mag, var_mag])
+    meas_variance_vector = Matrix([var_gps, var_baro])
 
     R = Matrix.diag(*meas_variance_vector)
 
-    print("Lambdifing functions...")
+    if not generate_eqs:
+        print("Lambdifing functions...")
 
-    functions_handles = {}
-    functions_handles["f"] = lambdify([*state_vector, *control_vector, g, dt], f)
-    functions_handles["F"] = lambdify([*state_vector, *control_vector, g, dt], F)
-    functions_handles["Q"] = lambdify([*state_vector, *control_vector, var_acc, var_gyr, g, dt], Q)
-    functions_handles["h"] = lambdify([*state_vector], h)
-    functions_handles["H"] = lambdify([*state_vector], H)
-    functions_handles["R"] = lambdify([var_gps, var_baro, var_mag], R)
+        functions_handles = {}
+        functions_handles["f"] = lambdify([*state_vector, g, dt], f)
+        functions_handles["F"] = lambdify([*state_vector, g, dt], F)
+        functions_handles["Q"] = lambdify([*state_vector, var_h, g, dt], Q)
+        functions_handles["h"] = lambdify([*state_vector], h)
+        functions_handles["H"] = lambdify([*state_vector], H)
+        functions_handles["R"] = lambdify([var_gps, var_baro], R)
 
-    print("Done!")
+        print("Done!")
 
-    return functions_handles
+        return functions_handles
+    else:
+        print("Generating equations...")
+
+        P = _create_cov_matrix(state_vector.shape[0])
+
+        code_gen.write_cov_matrix("cov", generate_cov_prediction(P, F, Q))
+        code_gen.write_obs_eqs("fusion", generate_observation_equations(P, H, R))
+
+        print("Done!")
 
 
 if __name__ == "__main__":

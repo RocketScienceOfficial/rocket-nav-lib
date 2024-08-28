@@ -20,6 +20,8 @@ with open("./ekf/data/flightlog.csv") as file:
     reader = csv.reader(file, delimiter=",")
 
     base_params = []
+    currentPress = 0
+    currentHeight = 0
 
     for x in reader:
         acc1_x = float(x[1])
@@ -49,7 +51,10 @@ with open("./ekf/data/flightlog.csv") as file:
         if len(base_params) == 0:
             base_params = [geo.baro_formula(press), lat, lon, alt]
 
-        baro_height = geo.baro_formula(press) - base_params[0]
+        if abs(press - currentPress) <= 50 or currentPress == 0:
+            currentPress = press
+            currentHeight = geo.baro_formula(currentPress) - base_params[0]
+
         pos = geo.geo_to_ned(lat, lon, alt, base_params[1], base_params[2], base_params[3])
 
         data.append(
@@ -57,7 +62,7 @@ with open("./ekf/data/flightlog.csv") as file:
                 pos[0],
                 pos[1],
                 pos[2],
-                baro_height,
+                currentHeight,
                 mag_x,
                 mag_y,
                 mag_z,
@@ -84,7 +89,7 @@ with open("./ekf/data/flightlog.csv") as file:
 # ========== FILTER ==========
 
 
-start_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+start_state = [0]
 start_covariance_value = 1
 variance_acc_1 = 0.5
 variance_acc_2 = 0.5
@@ -92,10 +97,8 @@ variance_acc_3 = 2
 variance_gyro_1 = 0.3
 variance_gyro_2 = 0.3
 variance_mag = 0.9
-variance_gps = 2.1
-variance_baro_height = 0.9
-
-start_state[0:4] = quaternion.quat_from_vecs([data[0][7], data[0][8], data[0][9]], [0, 0, abs(g)])
+variance_gps = 2.2
+variance_baro_height = 0.6
 
 handles = derivation.run_derivation(False)
 filt = ekf.ExtendedKalmanFilter(
@@ -109,22 +112,13 @@ acc_voter = voting.SensorVoting([6, 32, 100], [variance_acc_1, variance_acc_2, v
 gyro_voter = voting.SensorVoting([500, 2000], [variance_gyro_1, variance_gyro_2])
 
 filter_data = []
-tst = []
 
 for i in range(len(data)):
-    [acc_x, acc_x_var] = acc_voter.vote([data[i][7], data[i][10], data[i][13]])
-    [acc_y, acc_y_var] = acc_voter.vote([data[i][8], data[i][11], data[i][14]])
-    [acc_z, acc_z_var] = acc_voter.vote([data[i][9], data[i][12], data[i][15]])
-    [gyro_x, gyro_x_var] = gyro_voter.vote([data[i][16], data[i][19]])
-    [gyro_y, gyro_y_var] = gyro_voter.vote([data[i][17], data[i][20]])
-    [gyro_z, gyro_z_var] = gyro_voter.vote([data[i][18], data[i][21]])
-
-    tst.append([acc_x, acc_y, acc_z])
-
-    filt.predict([acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z], handles["f"], handles["F"], handles["Q"], [(acc_x_var + acc_y_var + acc_z_var) / 3, (gyro_x_var + gyro_y_var + gyro_z_var) / 3])
-    filt.correct(data[i][0:7], handles["h"], handles["H"], handles["R"], [variance_gps, variance_baro_height, variance_mag])
+    filt.predict([], handles["f"], handles["F"], handles["Q"], [1])
+    filt.correct([data[i][2], data[i][3]], handles["h"], handles["H"], handles["R"], [variance_gps, variance_baro_height])
 
     filter_data.append(filt.x[:, 0])
+    # filter_data.append([data[i][3]])
 
 
 # ========== ANALYSIS ==========
@@ -136,19 +130,80 @@ figure.set_figwidth(30)
 figure.set_figheight(10)
 
 t = np.arange(0, len(filter_data) * dt, dt)
-axis[0].plot(t, list(map(lambda x: x[9], filter_data)))
-axis[0].plot(t, list(map(lambda x: x[3], data)))
 
-axis[1].plot(list(map(lambda x: x[8], filter_data)), list(map(lambda x: x[7], filter_data)))
-axis[1].plot(list(map(lambda x: x[1], data)), list(map(lambda x: x[0], data)))
-axis[1].axis("scaled")
-
-# axis[2].plot(t, list(map(lambda x: (x[4] ** 2 + x[5] ** 2 + x[6] ** 2) ** 0.5, filter_data)))
-tmp = []
+axis[0].plot(t, list(map(lambda x: x[0], filter_data)))
+START_ACC_THRESHOLD = 35
+START_ALT_THRESHOLD = 4
+START_ALT_VERIFICATION_COUNT = 300
+APOGEE_MAX_DELTA = 4
+LAND_MAX_DELTA = 3
+LAST_ALT_APOGEE_VERIFICATION_COUNT = 200
+LAST_ALT_LAND_VERIFICATION_COUNT = 400
+state = "standing"
+verifingStandingAlt = False
+standingAltVerificationCount = 0
+apogee = 0
+lastAltApogeeVerificationIndex = 0
+landingAlt = 0
+lastAltLandVerificationIndex = 0
+currentTime = 0
 for i in range(len(data)):
-    tmp.append(quaternion.quat_rotate_vec(filter_data[i][0:4], [data[i][7], data[i][8], data[i][9]])[0])
-    # tmp.append([data[i][12]])
-    # tmp.append(data[i][9])
-axis[2].plot(t, tmp)
+    if state == "standing":
+        if not verifingStandingAlt:
+            acc_mag = (data[i][7] ** 2 + data[i][8] ** 2 + data[i][9] ** 2) ** 0.5
+
+            if acc_mag >= START_ACC_THRESHOLD:
+                verifingStandingAlt = True
+        if verifingStandingAlt:
+            if filter_data[i][0] >= START_ALT_THRESHOLD:
+                state = "accelerating"
+                axis[0].axvline(x=currentTime)
+            else:
+                standingAltVerificationCount += 1
+
+                if standingAltVerificationCount == START_ALT_VERIFICATION_COUNT:
+                    verifingStandingAlt = False
+                    standingAltVerificationCount = 0
+    elif state == "accelerating":
+        if (data[i][7] ** 2 + data[i][8] ** 2 + data[i][9] ** 2) ** 0.5 < 9.81:
+            state = "freeflight"
+            axis[0].axvline(x=currentTime)
+    elif state == "freeflight":
+        if filter_data[i][0] <= apogee or filter_data[i][0] - apogee <= APOGEE_MAX_DELTA:
+            lastAltApogeeVerificationIndex += 1
+
+            if lastAltApogeeVerificationIndex == LAST_ALT_APOGEE_VERIFICATION_COUNT:
+                state = "freefall"
+                axis[0].axvline(x=currentTime)
+        else:
+            apogee = filter_data[i][0]
+            lastAltApogeeVerificationIndex = 0
+    elif state == "freefall":
+        delta = abs(landingAlt - filter_data[i][0])
+
+        if delta > LAND_MAX_DELTA:
+            landingAlt = filter_data[i][0]
+            lastAltLandVerificationIndex = 0
+        else:
+            lastAltLandVerificationIndex += 1
+
+            if lastAltLandVerificationIndex == LAST_ALT_LAND_VERIFICATION_COUNT:
+                state = "landed"
+
+                axis[0].axvline(x=currentTime)
+
+    currentTime += dt
+
+
+axis[1].plot(t, list(map(lambda x: x[3], data)))
+currentTime = 0
+lastState = 0
+for i in range(len(data)):
+    if lastState != data[i][-1]:
+        axis[1].axvline(x=currentTime)
+        lastState = data[i][-1]
+    currentTime += dt
+
+axis[2].plot(t, list(map(lambda x: x[2], data)))
 
 plt.show()

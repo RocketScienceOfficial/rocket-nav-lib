@@ -1,14 +1,3 @@
-import math
-
-
-def quat_to_euler(q):
-    return [
-        math.atan2(2 * (q[0] * q[1] + q[2] + q[3]), 1 - 2 * (q[1] ** 2 + q[2] ** 2)),
-        math.asin(2 * (q[0] * q[2] - q[1] * q[3])),
-        math.atan2(2 * (q[0] * q[3] + q[1] * q[2]), 1 - 2 * (q[2] ** 2 + q[3] ** 2)),
-    ]
-
-
 def quat_normalize(q):
     d = (q[0] ** 2 + q[1] ** 2 + q[2] ** 2 + q[3] ** 2) ** 0.5
 
