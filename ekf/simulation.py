@@ -17,7 +17,7 @@ dt = 0.0025
 data = []
 
 #with open("./ekf/data/flightlog.csv") as file:
-with open("./ekf/data/test5.csv") as file:
+with open("./ekf/data/test6.csv") as file:
     reader = csv.reader(file, delimiter=",")
 
     base_params = []
@@ -98,7 +98,7 @@ variance_acc_3 = 2
 variance_gyro_1 = 0.3
 variance_gyro_2 = 0.3
 variance_mag = 0.9
-variance_gps = 1.3
+variance_gps = 1.0
 variance_baro_height = 1.8
 
 handles = derivation.run_derivation(False)
@@ -138,7 +138,7 @@ START_ALT_VERIFICATION_COUNT = 300
 APOGEE_MAX_DELTA = 2
 LAND_MAX_DELTA = 2
 LAST_ALT_APOGEE_VERIFICATION_COUNT = 200
-LAST_ALT_LAND_VERIFICATION_COUNT = 400
+LAST_ALT_LAND_VERIFICATION_COUNT = 300
 state = "standing"
 verifingStandingAlt = False
 standingAltVerificationCount = 0
