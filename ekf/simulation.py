@@ -16,13 +16,10 @@ dt = 0.0025
 
 data = []
 
-#with open("./ekf/data/flightlog.csv") as file:
-with open("./ekf/data/test6.csv") as file:
+with open("./ekf/data/flightlog.csv") as file:
     reader = csv.reader(file, delimiter=",")
 
     base_params = []
-    currentPress = 0
-    currentHeight = 0
 
     for x in reader:
         acc1_x = float(x[1])
@@ -52,9 +49,7 @@ with open("./ekf/data/test6.csv") as file:
         if len(base_params) == 0:
             base_params = [geo.baro_formula(press), lat, lon, alt]
 
-        if abs(press - currentPress) <= 50 or currentPress == 0:
-            currentPress = press
-            currentHeight = geo.baro_formula(currentPress) - base_params[0]
+        currentHeight = geo.baro_formula(press) - base_params[0]
 
         pos = geo.geo_to_ned(lat, lon, alt, base_params[1], base_params[2], base_params[3])
 
@@ -98,8 +93,8 @@ variance_acc_3 = 2
 variance_gyro_1 = 0.3
 variance_gyro_2 = 0.3
 variance_mag = 0.9
-variance_gps = 1.0
-variance_baro_height = 1.8
+variance_gps = 1.6
+variance_baro_height = 0.9
 
 handles = derivation.run_derivation(False)
 filt = ekf.ExtendedKalmanFilter(
@@ -132,78 +127,7 @@ figure.set_figheight(10)
 t = np.arange(0, len(filter_data) * dt, dt)
 
 axis[0].plot(t, list(map(lambda x: x[0], filter_data)))
-START_ACC_THRESHOLD = 35
-START_ALT_THRESHOLD = 5
-START_ALT_VERIFICATION_COUNT = 300
-APOGEE_MAX_DELTA = 2
-LAND_MAX_DELTA = 2
-LAST_ALT_APOGEE_VERIFICATION_COUNT = 200
-LAST_ALT_LAND_VERIFICATION_COUNT = 300
-state = "standing"
-verifingStandingAlt = False
-standingAltVerificationCount = 0
-apogee = 0
-lastAltApogeeVerificationIndex = 0
-landingAlt = 0
-lastAltLandVerificationIndex = 0
-currentTime = 0
-for i in range(len(data)):
-    if state == "standing":
-        if not verifingStandingAlt:
-            acc_mag = (data[i][7] ** 2 + data[i][8] ** 2 + data[i][9] ** 2) ** 0.5
-
-            if acc_mag >= START_ACC_THRESHOLD:
-                verifingStandingAlt = True
-        if verifingStandingAlt:
-            if filter_data[i][0] >= START_ALT_THRESHOLD:
-                state = "accelerating"
-                axis[0].axvline(x=currentTime)
-            else:
-                standingAltVerificationCount += 1
-
-                if standingAltVerificationCount == START_ALT_VERIFICATION_COUNT:
-                    verifingStandingAlt = False
-                    standingAltVerificationCount = 0
-    elif state == "accelerating":
-        if (data[i][7] ** 2 + data[i][8] ** 2 + data[i][9] ** 2) ** 0.5 < 9.81:
-            state = "freeflight"
-            axis[0].axvline(x=currentTime)
-    elif state == "freeflight":
-        if filter_data[i][0] <= apogee or filter_data[i][0] - apogee <= APOGEE_MAX_DELTA:
-            lastAltApogeeVerificationIndex += 1
-
-            if lastAltApogeeVerificationIndex == LAST_ALT_APOGEE_VERIFICATION_COUNT:
-                state = "freefall"
-                axis[0].axvline(x=currentTime)
-        else:
-            apogee = filter_data[i][0]
-            lastAltApogeeVerificationIndex = 0
-    elif state == "freefall":
-        delta = abs(landingAlt - filter_data[i][0])
-
-        if delta > LAND_MAX_DELTA:
-            landingAlt = filter_data[i][0]
-            lastAltLandVerificationIndex = 0
-        else:
-            lastAltLandVerificationIndex += 1
-
-            if lastAltLandVerificationIndex == LAST_ALT_LAND_VERIFICATION_COUNT:
-                state = "landed"
-
-                axis[0].axvline(x=currentTime)
-
-    currentTime += dt
-
-
 axis[1].plot(t, list(map(lambda x: x[3], data)))
-currentTime = 0
-lastState = 0
-for i in range(len(data)):
-    if lastState != data[i][-1]:
-        axis[1].axvline(x=currentTime)
-        lastState = data[i][-1]
-    currentTime += dt
-
 axis[2].plot(t, list(map(lambda x: x[2], data)))
 
 plt.show()
