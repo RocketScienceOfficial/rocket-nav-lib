@@ -16,7 +16,7 @@ dt = 0.0025
 
 data = []
 
-with open("./ekf/data/flightlog.csv") as file:
+with open("./ekf/data/flightlog3.csv") as file:
     reader = csv.reader(file, delimiter=",")
 
     base_params = []
@@ -41,10 +41,10 @@ with open("./ekf/data/flightlog.csv") as file:
         mag_y = float(x[17])
         mag_z = float(x[18])
         press = float(x[19])
-        lat = float(x[21])
-        lon = float(x[22])
-        alt = float(x[23])
-        state = float(x[24])
+        lat = float(x[22])
+        lon = float(x[23])
+        alt = float(x[24])
+        state = float(x[25])
 
         if len(base_params) == 0:
             base_params = [geo.baro_formula(press), lat, lon, alt]
@@ -87,12 +87,6 @@ with open("./ekf/data/flightlog.csv") as file:
 
 start_state = [0]
 start_covariance_value = 1
-variance_acc_1 = 0.5
-variance_acc_2 = 0.5
-variance_acc_3 = 2
-variance_gyro_1 = 0.3
-variance_gyro_2 = 0.3
-variance_mag = 0.9
 variance_gps = 1.6
 variance_baro_height = 0.9
 
@@ -103,9 +97,6 @@ filt = ekf.ExtendedKalmanFilter(
     dt,
     g,
 )
-
-acc_voter = voting.SensorVoting([6, 32, 100], [variance_acc_1, variance_acc_2, variance_acc_3])
-gyro_voter = voting.SensorVoting([500, 2000], [variance_gyro_1, variance_gyro_2])
 
 filter_data = []
 
